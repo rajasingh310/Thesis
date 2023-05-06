@@ -9,6 +9,7 @@ from find_sigma1 import find_sigma1
 from images_labels import images_and_labels
 import numpy as np
 import math
+from deep_neural_networks import algorithm_fcnn
 
 
 '''
@@ -85,24 +86,32 @@ k_nearest = 9
 
 [x_data, y_data] = images_and_labels(train_val_test, window_rows, window_cols, window_stride, mat_list_names, k_nearest, sigma)
 
+
+
+
 # Get the size of the dimension to be shuffled
-dim_size = x_data.shape[4]
+dim_size = x_data.shape[0]
 
 # Generate a random permutation of the indices along the dimension to be shuffled
 perm = np.random.permutation(dim_size)
 
 # Use advanced indexing to reorder the array according to the permutation
-shuffled_x_data = x_data[:, :, :, :, perm]
-shuffled_y_data = y_data[perm, :]
+shuffled_x_data = x_data[perm, :, :, :, :]
+shuffled_y_data = np.squeeze(y_data[perm, :], axis=None)
+
 
 train_val_ratio = 0.7
 
-x_train = shuffled_x_data[:, :, :, :, :math.floor(train_val_ratio*dim_size)]
-y_train = shuffled_y_data[:math.floor(train_val_ratio*dim_size), :]
-x_val = shuffled_x_data[:, :, :, :, math.floor(train_val_ratio*dim_size+1):]
-y_val = shuffled_y_data[math.floor(train_val_ratio*dim_size+1):, :]
+x_train = shuffled_x_data[:math.floor(train_val_ratio*dim_size), :, :, :, :]
+y_train = shuffled_y_data[:math.floor(train_val_ratio*dim_size), ]
+x_val = shuffled_x_data[math.floor(train_val_ratio*dim_size+1):, :, :, :, :]
+y_val = shuffled_y_data[math.floor(train_val_ratio*dim_size+1):, ]
 
+# Execute algorithm_fcnn function
+net = algorithm_fcnn(x_train, x_val, y_train, y_val)
 
+# Print final result
+print("Training completed!")
 
 
 

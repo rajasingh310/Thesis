@@ -27,16 +27,15 @@ def images_and_labels(new_dataset, window_row, window_colm, window_stride, mat_n
         img[mat_idx] = np.stack(img[mat_idx][:], axis=3)
         img[mat_idx] = np.expand_dims(img[mat_idx], axis=2)
         img[mat_idx] = np.transpose(img[mat_idx], (4, 0, 1, 2, 3))
-        print(mat_idx)
+        print('Material no: ', mat_idx)
 
         raw_img[mat_idx] = np.concatenate(raw_images_data[mat_idx, :], axis=0)
         raw_img[mat_idx] = np.stack(raw_img[mat_idx][:], axis=4)
         raw_img[mat_idx] = np.transpose(raw_img[mat_idx], (4, 0, 1, 2, 3))
-        print(mat_idx)
 
     labels_data = np.empty((0, 0))  # initialize as empty numpy array
     for mat_idx in range(len(mat_names)):
-        labels_data_mat = np.tile(mat_names[mat_idx], (img[mat_idx].shape[0], 1))
+        labels_data_mat = np.tile(mat_idx, (img[mat_idx].shape[0], 1))
         if labels_data.size == 0:  # if this is the first iteration, assign the first array to labels_data
             labels_data = labels_data_mat
         else:  # concatenate the new array with the existing array
@@ -49,6 +48,7 @@ def images_and_labels(new_dataset, window_row, window_colm, window_stride, mat_n
     raw_images = np.transpose(raw_images, (1, 2, 3, 4, 0))
 
     images = knn(images, raw_images, k)
+    images = np.transpose(images, (4, 3, 2, 0, 1))
     labels = np.vstack(labels_data)
 
     return images, labels
