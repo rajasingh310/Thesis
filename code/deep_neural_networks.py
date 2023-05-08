@@ -4,6 +4,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
 import numpy as np
 from sklearn.metrics import confusion_matrix
+from tensorboardX import SummaryWriter
 
 class Net(nn.Module):
     def __init__(self, input_shape, output_shape):
@@ -59,6 +60,8 @@ def algorithm_fcnn(x_train, x_val, y_train, y_val):
     optimizer = optim.Adam(net.parameters(), lr=0.0008)
     criterion = nn.CrossEntropyLoss()
 
+    writer = SummaryWriter()  # Create a SummaryWriter for logging
+
     for epoch in range(50):
         net.train()
         train_loss = 0.0
@@ -99,6 +102,15 @@ def algorithm_fcnn(x_train, x_val, y_train, y_val):
 
         val_accuracy = 100 * val_correct / val_total
         val_loss /= len(val_loader)
+
+        # Logging the training and validation loss to TensorBoard
+        writer.add_scalar('Loss/Train', train_loss, epoch)
+        writer.add_scalar('Loss/Validation', val_loss, epoch)
+
+        # Logging the training and validation accuracy to TensorBoard
+        writer.add_scalar('Accuracy/Train', train_accuracy, epoch)
+        writer.add_scalar('Accuracy/Validation', val_accuracy, epoch)
+
         print("Epoch: {}/50, Training Loss: {:.4f}, Training Accuracy: {:.2f}%, Validation Loss: {:.4f}, Validation Accuracy: {:.2f}%".format(epoch + 1,
                                                                                                                                                     train_loss,
                                                                                                                                                     train_accuracy,
@@ -113,5 +125,8 @@ def algorithm_fcnn(x_train, x_val, y_train, y_val):
     cm = confusion_matrix(y_true, y_pred)
     print("Confusion Matrix:")
     print(cm)
+
+    # Closing the SummaryWriter
+    writer.close()
 
     return net
