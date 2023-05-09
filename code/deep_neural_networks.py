@@ -48,19 +48,27 @@ class Net(nn.Module):
         return x
 
 
-def algorithm_fcnn(x_train, x_val, y_train, y_val):
+def algorithm_fcnn(x_train, x_val, y_train, y_val, log_write):
 
-    train_dataset = TensorDataset(torch.Tensor(x_train), torch.Tensor(y_train))
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        print("GPU is available: ", torch.cuda.get_device_name(device=None))
+    else:
+        device = torch.device("cpu")
+        print("GPU is not available, using CPU")
+
+    train_dataset = TensorDataset(torch.Tensor(x_train).to(device), torch.Tensor(y_train).to(device))
     train_loader = DataLoader(train_dataset, batch_size=1000, shuffle=True)
 
-    val_dataset = TensorDataset(torch.Tensor(x_val), torch.Tensor(y_val))
+    val_dataset = TensorDataset(torch.Tensor(x_val).to(device), torch.Tensor(y_val).to(device))
     val_loader = DataLoader(val_dataset, batch_size=1000, shuffle=True)
 
-    net = Net(input_shape=x_train.shape, output_shape=len(np.unique(y_train)))
+    net = Net(input_shape=x_train.shape, output_shape=len(np.unique(y_train))).to(device)
     optimizer = optim.Adam(net.parameters(), lr=0.0008)
     criterion = nn.CrossEntropyLoss()
 
-    writer = SummaryWriter()  # Create a SummaryWriter for logging
+    if log_write:
+        writer = SummaryWriter()
 
     for epoch in range(50):
         net.train()
@@ -70,6 +78,7 @@ def algorithm_fcnn(x_train, x_val, y_train, y_val):
 
         for i, (inputs, labels) in enumerate(train_loader):
             optimizer.zero_grad()
+            inputs, labels = inputs.to(device), labels.to(device)
             outputs = net(inputs)
             loss = criterion(outputs, labels.long())
             loss.backward()
@@ -92,6 +101,7 @@ def algorithm_fcnn(x_train, x_val, y_train, y_val):
 
         with torch.no_grad():
             for inputs, labels in val_loader:
+                inputs, labels = inputs.to(device), labels.to(device)
                 outputs = net(inputs)
                 val_loss += criterion(outputs, labels.long()).item()
                 _, predicted = torch.max(outputs.data, 1)
@@ -103,30 +113,26 @@ def algorithm_fcnn(x_train, x_val, y_train, y_val):
         val_accuracy = 100 * val_correct / val_total
         val_loss /= len(val_loader)
 
-        # Logging the training and validation loss to TensorBoard
-        writer.add_scalar('Loss/Train', train_loss, epoch)
-        writer.add_scalar('Loss/Validation', val_loss, epoch)
+        if log_write:
+            writer.add_scalar('Loss/Train', train_loss, epoch)
+            writer.add_scalar('Loss/Validation', val_loss, epoch)
+            writer.add_scalar('Accuracy/Train', train_accuracy, epoch)
+            writer.add_scalar('Accuracy/Validation', val_accuracy, epoch)
 
-        # Logging the training and validation accuracy to TensorBoard
-        writer.add_scalar('Accuracy/Train', train_accuracy, epoch)
-        writer.add_scalar('Accuracy/Validation', val_accuracy, epoch)
+        print("Epoch: {}/50, Training Loss: {:.4f}, Training Accuracy: {:.2f}%, Validation Loss: {:.4f}, Validation Accuracy: {:.2f}%".format(
+            epoch + 1,
+            train_loss,
+            train_accuracy,
+            val_loss,
+            val_accuracy))
 
-        print("Epoch: {}/50, Training Loss: {:.4f}, Training Accuracy: {:.2f}%, Validation Loss: {:.4f}, Validation Accuracy: {:.2f}%".format(epoch + 1,
-                                                                                                                                                    train_loss,
-                                                                                                                                                    train_accuracy,
-                                                                                                                                                    val_loss,
-                                                                                                                                                    val_accuracy))
-
-    # Convert the true and predicted labels to NumPy arrays
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
-
-    # Calculate the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
     print("Confusion Matrix:")
     print(cm)
 
-    # Closing the SummaryWriter
-    writer.close()
+    if log_write:
+        writer.close()
 
     return net

@@ -11,6 +11,7 @@ import numpy as np
 import math
 from deep_neural_networks import algorithm_fcnn
 
+log_write = False
 
 '''
     Directory name for dataset:
@@ -20,7 +21,7 @@ from deep_neural_networks import algorithm_fcnn
 '''
 
 # Directory path
-dataset_dir = 'dataset_2'
+dataset_dir = 'dataset_3'
 
 full_dataset_dir = os.path.join('..\\datasets', dataset_dir)
 print(full_dataset_dir)
@@ -108,7 +109,7 @@ x_val = shuffled_x_data[math.floor(train_val_ratio*dim_size+1):, :, :, :, :]
 y_val = shuffled_y_data[math.floor(train_val_ratio*dim_size+1):, ]
 
 # Execute algorithm_fcnn function
-net = algorithm_fcnn(x_train, x_val, y_train, y_val)
+net = algorithm_fcnn(x_train, x_val, y_train, y_val, log_write)
 
 # Print final result
 print("Training completed!")
