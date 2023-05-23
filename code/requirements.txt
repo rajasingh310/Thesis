@@ -5,3 +5,5 @@ openpyxl
 tensorboardX
 tensorflow
 tensorboard
+tqdm
+matplotlib
