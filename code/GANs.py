@@ -1,4 +1,4 @@
-def ConditionalGANs(real_data, real_labels, num_samples, log_write):
+def GANs(real_data, real_labels, num_samples, log_write):
 
     import torch
     from torch import nn
@@ -220,14 +220,18 @@ def ConditionalGANs(real_data, real_labels, num_samples, log_write):
     #   *   device: the device type
     #
 
-    # In[ ]:
+    # Define the number of iterations for critic and generator updates
+    n_critic = 5
+    n_generator = 1
 
-    criterion = nn.BCEWithLogitsLoss()
-    n_epochs = 30
+    # Define a function to compute Wasserstein loss
+    def wasserstein_loss(real_score, fake_score):
+        return -torch.mean(real_score) + torch.mean(fake_score)
+
+    n_epochs = 20
     z_dim = 64
-    display_step = 500
     batch_size = 1000
-    lr = 0.002
+    lr = 0.0008
     device = 'cuda'
 
     real_data = np.reshape(real_data, (real_data.shape[0], 144))
@@ -255,16 +259,18 @@ def ConditionalGANs(real_data, real_labels, num_samples, log_write):
             discriminator_im_chan: the number of input channels to the discriminator
                                 (e.g. C x 28 x 28 for MNIST)
         '''
-        generator_input_dim = z_dim + n_classes
-        discriminator_im_chan = real_data_shape[0]*real_data_shape[1]*real_data_shape[2]*real_data_shape[3] + n_classes
+        generator_input_dim = z_dim
+        discriminator_im_chan = real_data_shape[0]*real_data_shape[1]*real_data_shape[2]*real_data_shape[3]
         return generator_input_dim, discriminator_im_chan
 
     generator_input_dim, discriminator_im_chan = get_input_dimensions(z_dim, real_data_shape, n_classes)
 
-    gen = Generator(input_dim=generator_input_dim, output_dim=discriminator_im_chan-n_classes).to(device)
-    gen_opt = torch.optim.Adam(gen.parameters(), lr=lr)
+    gen = Generator(input_dim=generator_input_dim, output_dim=discriminator_im_chan).to(device)
     disc = Discriminator(input_dim=discriminator_im_chan).to(device)
-    disc_opt = torch.optim.Adam(disc.parameters(), lr=lr)
+
+    # Define the optimizer for critic and generator
+    disc_opt = torch.optim.RMSprop(disc.parameters(), lr=lr)
+    gen_opt = torch.optim.RMSprop(gen.parameters(), lr=lr)
 
     def weights_init(m):
         if isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d):
@@ -286,81 +292,48 @@ def ConditionalGANs(real_data, real_labels, num_samples, log_write):
             # Flatten the batch of real images from the dataset
             real = real.to(device)
             labels = torch.squeeze(labels.to(device)).long()
-            one_hot_labels = get_one_hot_labels(labels, n_classes)
 
-            ### Update discriminator ###
-            # Zero out the discriminator gradients
-            disc_opt.zero_grad()
-            # Get noise corresponding to the current batch_size
-            fake_noise = get_noise(cur_batch_size, z_dim, device=device)
+            # Update the discriminator for n_discriminator iterations
+            for _ in range(n_critic):
 
-            # Now you can get the images from the generator
-            # Steps: 1) Combine the noise vectors and the one-hot labels for the generator
-            #        2) Generate the conditioned fake images
+                disc_opt.zero_grad()
+                fake_noise = get_noise(cur_batch_size, z_dim, device=device)
 
-            noise_and_labels = combine_vectors(fake_noise, one_hot_labels)
-            fake = gen(noise_and_labels)
+                fake = gen(fake_noise)
 
-            # Make sure that enough images were generated
-            assert len(fake) == len(real)
-            # Check that correct tensors were combined
-            assert tuple(noise_and_labels.shape) == (cur_batch_size, fake_noise.shape[1] + one_hot_labels.shape[1])
-            # It comes from the correct generator
-            assert tuple(fake.shape) == (len(real), discriminator_im_chan-n_classes)
+                disc_fake_pred = disc(fake.detach())
+                disc_real_pred = disc(real)
 
-            # Now you can get the predictions from the discriminator
-            # Steps: 1) Create the input for the discriminator
-            #           a) Combine the fake images with image_one_hot_labels,
-            #              remember to detach the generator (.detach()) so you do not backpropagate through it
-            #           b) Combine the real images with image_one_hot_labels
-            #        2) Get the discriminator's prediction on the fakes as disc_fake_pred
-            #        3) Get the discriminator's prediction on the reals as disc_real_pred
 
-            #### START CODE HERE ####
-            fake_image_and_labels = combine_vectors(fake, one_hot_labels)
-            real_image_and_labels = combine_vectors(real, one_hot_labels)
-            disc_fake_pred = disc(fake_image_and_labels.detach())
-            disc_real_pred = disc(real_image_and_labels)
-            #### END CODE HERE ####
+                # Compute the Wasserstein loss for critic
+                disc_loss = wasserstein_loss(disc_real_pred, disc_fake_pred)
+                disc_loss.backward(retain_graph=True)
 
-            disc_fake_loss = criterion(disc_fake_pred, torch.zeros_like(disc_fake_pred))
-            disc_real_loss = criterion(disc_real_pred, torch.ones_like(disc_real_pred))
-            disc_loss = (disc_fake_loss + disc_real_loss) / 2
-            disc_loss.backward(retain_graph=True)
-            disc_opt.step()
+                disc_opt.step()
 
-            ### Update generator ###
-            # Zero out the generator gradients
-            gen_opt.zero_grad()
+                # Clip the critic weights to enforce Lipschitz constraint
+                for p in disc.parameters():
+                    p.data.clamp_(-0.01, 0.01)
 
-            # This will error if you didn't concatenate your labels to your image correctly
-            noise_and_labels = combine_vectors(fake_noise, one_hot_labels)
-            fake = gen(noise_and_labels)
-            fake_image_and_labels = combine_vectors(fake, one_hot_labels)
-            disc_fake_pred = disc(fake_image_and_labels)
-            gen_loss = criterion(disc_fake_pred, torch.ones_like(disc_fake_pred))
-            gen_loss.backward()
-            gen_opt.step()
+            # Update the generator for n_generator iterations
+            for _ in range(n_generator):
 
-        print(f"Epoch: {epoch}, Generator loss: {gen_loss}, discriminator loss: {disc_loss}")
+                gen_opt.zero_grad()
+
+                fake = gen(fake_noise)
+
+                disc_fake_pred = disc(fake)
+
+                # Compute the Wasserstein loss for generator
+                # Note that we use -fake_score because we want to maximize it
+                gen_loss = -torch.mean(disc_fake_pred)
+                gen_loss.backward()
+                gen_opt.step()
+
+        print(f"Epoch: {epoch}, Generator loss: {gen_loss}, Discriminator loss: {disc_loss}")
 
         if log_write:
             writer.add_scalar('Generator loss', gen_loss, epoch)
             writer.add_scalar('Discriminator loss', disc_loss, epoch)
 
-
-
-    # ## Exploration
-    # You can do a bit of exploration now!
-
-    # In[ ]:
-
-    # Before you explore, you should put the generator
-    # in eval mode, both in general and so that batch norm
-    # doesn't cause you issues and is using its eval statistics
-    gen = gen.eval()
-
-    # #### Changing the Class Vector
-    # You can generate some numbers with your new model! You can add interpolation as well to make it more interesting.
-
-    return 2, 4
+    return 0, 0

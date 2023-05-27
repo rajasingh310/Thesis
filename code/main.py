@@ -11,8 +11,9 @@ import numpy as np
 import math
 from deep_neural_networks import algorithm_fcnn
 from ConditionalGANs import ConditionalGANs
+from GANs import GANs
 
-log_write = True
+log_write = False
 preload_data = True
 
 if preload_data == False:
@@ -25,7 +26,7 @@ if preload_data == False:
     '''
 
     # Directory path
-    dataset_dir = 'dataset_2'
+    dataset_dir = 'dataset_3'
 
     full_dataset_dir = os.path.join('..\\datasets', dataset_dir)
     print(full_dataset_dir)
@@ -101,7 +102,8 @@ loaded_data = np.load('data.npz')
 x_data = loaded_data['x']
 y_data = loaded_data['y']
 
-
+x_data = x_data[:297919, :, :, :, :]
+y_data = y_data[:297919]
 
 
 # Get the size of the dimension to be shuffled
@@ -128,7 +130,8 @@ y_val = shuffled_y_data[math.floor(train_val_ratio*dim_size+1):, ]
 # Print final result
 print("Training completed!")
 num_samples = 200
-generated_data, generated_data_labels = ConditionalGANs(x_data, y_data, num_samples, log_write)
+_, _ = GANs(x_data, y_data, num_samples, log_write)
+_, _ = ConditionalGANs(x_data, y_data, num_samples, log_write)
 
 
 
