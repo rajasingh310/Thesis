@@ -1,11 +1,13 @@
 import numpy as np
 
-preload_data = False
+preload_data = True
 pad = True
 crop_pixel_of_interest = True
 save_images = False
 filter = True
+log_write=False
 
+dataset_dir = 'dataset_2'
 
 if not preload_data:
     '''
@@ -15,8 +17,6 @@ if not preload_data:
         dataset_3 = Five material dataset acquired by Mr. Santosh Kasam in the year 2021
 
     '''
-
-    dataset_dir = 'dataset_3'
 
     from DataLoader import DataLoader
     load_data = DataLoader(dataset_dir=dataset_dir)
@@ -61,3 +61,21 @@ abs_data = loaded_data['abs_dataset']
 r_i_dataset = loaded_data['r_i_dataset']
 labels = loaded_data['labels']
 num_mats = loaded_data['num_mats']
+
+gen_input_data = np.concatenate(abs_data[:, 0], axis=0)
+gen_input_data = gen_input_data[np.newaxis, np.newaxis, ...]
+gen_input_data = np.reshape(gen_input_data, (-1, 1, 172, 224))
+
+disc_input_data = np.concatenate(r_i_dataset[:, 0], axis=0)
+disc_input_data = disc_input_data[np.newaxis, ...]
+disc_input_data = np.reshape(disc_input_data, (-1, 2, 8, 172, 224))
+
+labels = np.concatenate(labels[:, 0], axis=0)
+labels = np.reshape(labels, (-1, 172, 224))
+
+from GANs import GANs
+
+GANs(gen_input_data, disc_input_data, labels, log_write=log_write)
+
+
+a = 2
