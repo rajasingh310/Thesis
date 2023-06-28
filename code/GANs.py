@@ -48,6 +48,34 @@ class Generator(nn.Module):
         return data
 
 
+def d3d(input_channel, output_channel, kernel=(5, 5, 5)):
+    return nn.Sequential(
+        nn.BatchNorm3d(input_channel),
+        nn.Conv3d(input_channel, output_channel, kernel),
+        nn.ReLU()
+    )
+
+
+class Discriminator(nn.Module):
+
+    def __init__(self, disc_input_shape):
+        super(Discriminator, self).__init__()
+
+        self.disc_input_shape = disc_input_shape
+
+        self.D_Net = nn.Sequential(
+            d3d(self.disc_input_shape[1], self.disc_input_shape[1] * 4, kernel=(4, 10, 10)),
+            d3d(self.disc_input_shape[1] * 4, self.disc_input_shape[1] * 8, kernel=(4, 10, 10)),
+            d3d(self.disc_input_shape[1] * 8, self.disc_input_shape[1] * 32, kernel=(1, 10, 10)),
+        )
+
+    def forward(self, disc_input):
+        data = self.D_Net(disc_input)
+        layer = nn.Linear(data.shape[1] * data.shape[2] * data.shape[3] * data.shape[4], 1, device='cuda')
+        data = torch.reshape(data, (data.shape[0], -1))
+        return layer(data)
+
+
 class GANs:
 
     def __init__(self, gen_input, disc_input, labels, log_write):
@@ -60,4 +88,7 @@ class GANs:
         self.disc_input_shape = self.disc_input.shape
 
         Gen = Generator(self.gen_input_shape).to('cuda')
-        f = Gen(self.gen_input[:5, ...])
+        fake = Gen(self.gen_input[:5, ...])
+
+        Disc = Discriminator(self.disc_input_shape).to('cuda')
+        y_pred = Disc(fake)
