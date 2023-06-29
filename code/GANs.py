@@ -1,17 +1,15 @@
 import torch
 from torch import nn
-from tqdm.auto import tqdm
 from torch.utils.data import DataLoader, TensorDataset
-import torch.nn.functional as F
-import numpy as np
 from tensorboardX import SummaryWriter
+import time
 
 
 def g2d(input_channel, output_channel, kernel=5):
     return nn.Sequential(
         nn.BatchNorm2d(input_channel),
         nn.Conv2d(input_channel, output_channel, kernel),
-        nn.ReLU(),
+        nn.ReLU()
     )
 
 
@@ -87,8 +85,57 @@ class GANs:
         self.gen_input_shape = self.gen_input.shape
         self.disc_input_shape = self.disc_input.shape
 
-        Gen = Generator(self.gen_input_shape).to('cuda')
-        fake = Gen(self.gen_input[:5, ...])
+        self.lr = 0.008
+        self.n_epochs = 30
+        self.batch_size = 3
+        self.criterion = nn.BCEWithLogitsLoss()
+        self.iter = 0
 
-        Disc = Discriminator(self.disc_input_shape).to('cuda')
-        y_pred = Disc(fake)
+
+        gen = Generator(self.gen_input_shape).to('cuda')
+        disc = Discriminator(self.disc_input_shape).to('cuda')
+
+        gen_opt = torch.optim.Adam(gen.parameters(), lr=self.lr)
+        disc_opt = torch.optim.Adam(disc.parameters(), lr=self.lr)
+
+        dataset = TensorDataset(self.gen_input, self.disc_input, self.labels)
+        dataloader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+
+        if log_write:
+            writer = SummaryWriter()
+
+        self.t0 = time.time()
+        for epoch in range(self.n_epochs):
+            self.iteration = 0
+            for gen_batch_input, disc_batch_input, labels in dataloader:
+
+                disc_opt.zero_grad()
+                fake = gen(gen_batch_input)
+
+                disc_fake_pred = disc(fake.detach())
+                disc_real_pred = disc(disc_batch_input)
+
+                disc_fake_loss = self.criterion(disc_fake_pred, torch.zeros_like(disc_fake_pred))
+                disc_real_loss = self.criterion(disc_real_pred, torch.ones_like(disc_real_pred))
+                disc_loss = (disc_fake_loss + disc_real_loss) / 2
+
+                disc_loss.backward(retain_graph=True)
+                disc_opt.step()
+
+                gen_opt.zero_grad()
+
+                disc_fake_pred_for_gen = disc(fake)
+                gen_loss = self.criterion(disc_fake_pred_for_gen, torch.ones_like(disc_fake_pred))
+
+                gen_loss.backward()
+                gen_opt.step()
+
+                self.iteration += 1
+                self.iter += 1
+                self.current_t = time.time()
+
+                print(f"Epoch: {epoch}, Iteration: {self.iteration}, Time: {int(self.current_t - self.t0)} sec., Generator loss: {gen_loss}, discriminator loss: {disc_loss}")
+
+                if log_write:
+                    writer.add_scalar('Generator loss', gen_loss, self.iter)
+                    writer.add_scalar('Discriminator loss', disc_loss, self.iter)
