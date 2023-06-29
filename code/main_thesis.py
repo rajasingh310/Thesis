@@ -5,7 +5,7 @@ pad = True
 crop_pixel_of_interest = True
 save_images = False
 filter = True
-log_write=False
+log_write = True
 
 dataset_dir = 'dataset_2'
 
@@ -74,8 +74,6 @@ labels = np.concatenate(labels[:, 0], axis=0)
 labels = np.reshape(labels, (-1, 172, 224))
 
 from GANs import GANs
-
 GANs(gen_input_data, disc_input_data, labels, log_write=log_write)
-
 
 a = 2
