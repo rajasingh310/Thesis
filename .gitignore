@@ -4,3 +4,4 @@ presentation/
 datasets/
 *.npz
 code/__pycache__/
+code/runs/

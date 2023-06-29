@@ -74,6 +74,6 @@ labels = np.concatenate(labels[:, 0], axis=0)
 labels = np.reshape(labels, (-1, 172, 224))
 
 from GANs import GANs
-GANs(gen_input_data, disc_input_data, labels, log_write=log_write)
+GANs(gen_input_data, disc_input_data, labels, loss='wasserstein', log_write=log_write)
 
 a = 2

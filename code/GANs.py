@@ -74,9 +74,11 @@ class Discriminator(nn.Module):
         return layer(data)
 
 
+def wasserstein_loss(fake_score, real_score):
+    return torch.mean(fake_score) - torch.mean(real_score)
 class GANs:
 
-    def __init__(self, gen_input, disc_input, labels, log_write):
+    def __init__(self, gen_input, disc_input, labels, log_write, loss='BCE'):
         self.gen_input = torch.from_numpy(gen_input).to(torch.float).to('cuda')
         self.disc_input = torch.from_numpy(disc_input).to(torch.float).to('cuda')
         self.labels = torch.from_numpy(labels)
@@ -88,9 +90,10 @@ class GANs:
         self.lr = 0.008
         self.n_epochs = 30
         self.batch_size = 3
-        self.criterion = nn.BCEWithLogitsLoss()
         self.iter = 0
+        self.clip_value = 0.01
 
+        self.criterion = nn.BCEWithLogitsLoss()
 
         gen = Generator(self.gen_input_shape).to('cuda')
         disc = Discriminator(self.disc_input_shape).to('cuda')
@@ -109,23 +112,34 @@ class GANs:
             self.iteration = 0
             for gen_batch_input, disc_batch_input, labels in dataloader:
 
-                disc_opt.zero_grad()
-                fake = gen(gen_batch_input)
+                for _ in range(5):
+                    disc_opt.zero_grad()
+                    fake = gen(gen_batch_input)
 
-                disc_fake_pred = disc(fake.detach())
-                disc_real_pred = disc(disc_batch_input)
+                    disc_fake_pred = disc(fake.detach())
+                    disc_real_pred = disc(disc_batch_input)
 
-                disc_fake_loss = self.criterion(disc_fake_pred, torch.zeros_like(disc_fake_pred))
-                disc_real_loss = self.criterion(disc_real_pred, torch.ones_like(disc_real_pred))
-                disc_loss = (disc_fake_loss + disc_real_loss) / 2
+                    if loss == 'BEC':
+                        disc_fake_loss = self.criterion(disc_fake_pred, torch.zeros_like(disc_fake_pred))
+                        disc_real_loss = self.criterion(disc_real_pred, torch.ones_like(disc_real_pred))
+                        disc_loss = (disc_fake_loss + disc_real_loss) / 2
+                    elif loss == 'wasserstein':
+                        disc_loss = wasserstein_loss(disc_fake_pred, disc_real_pred)
 
-                disc_loss.backward(retain_graph=True)
-                disc_opt.step()
+                    disc_loss.backward(retain_graph=True)
+                    disc_opt.step()
+
+                    if loss == 'wasserstein':
+                        for p in disc.parameters():
+                            p.data.clamp_(-self.clip_value, self.clip_value)
 
                 gen_opt.zero_grad()
 
                 disc_fake_pred_for_gen = disc(fake)
-                gen_loss = self.criterion(disc_fake_pred_for_gen, torch.ones_like(disc_fake_pred))
+                if loss == 'BCE':
+                    gen_loss = self.criterion(disc_fake_pred_for_gen, torch.ones_like(disc_fake_pred))
+                elif loss == 'wasserstein':
+                    gen_loss = - torch.mean(disc_fake_pred_for_gen)
 
                 gen_loss.backward()
                 gen_opt.step()
