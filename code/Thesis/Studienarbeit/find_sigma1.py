@@ -5,8 +5,7 @@ def find_sigma1(data):
     for i in range(data.shape[0]):
         sigma_i = []
         for j in range(data.shape[1]):
-            data_ij = np.transpose(data[i, j], (2, 3, 0, 1))
-            data_ij = np.reshape(data_ij, (8, 2, -1), order='F')
+            data_ij = np.reshape(data[i, j], (8, 2, -1), order='F')
             data_ij = np.transpose(data_ij, (2, 0, 1))
             data_ij = np.reshape(data_ij, (data_ij.shape[0], -1), order='F')
             sigma_i.append(data_ij)
