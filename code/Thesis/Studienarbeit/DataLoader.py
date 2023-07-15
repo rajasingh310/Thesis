@@ -9,7 +9,7 @@ class DataLoader:
         self.data, self.mat_list_names, self.pix_ranges = self.load_tof_dataset(dataset_dir)
 
     def load_tof_dataset(self, dataset_dir):
-        full_dataset_dir = os.path.join('..\\datasets', dataset_dir)
+        full_dataset_dir = os.path.join('..\\..\\..\\datasets', dataset_dir)
 
         # Find .mat file in the directory
         mat_files = [f for f in os.listdir(full_dataset_dir) if f.endswith('.mat')]

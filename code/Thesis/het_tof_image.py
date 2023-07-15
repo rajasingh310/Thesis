@@ -87,8 +87,8 @@ class HetToFImage:
             d_abs = np.concatenate(d_i_abs[:, 0], axis=0)
             d_abs = np.prod(d_abs, axis=0)
 
-            if filter:
-                d_abs = d_abs * z_[0, inst_list[0]]
+            #   if filter:
+                #   d_abs = d_abs * z_[0, inst_list[0]]
             self.new_abs_dataset[m, 0] = d_abs
 
             d_r_i = np.prod(d_i_r_i[:, 0])
@@ -98,5 +98,3 @@ class HetToFImage:
             lab = np.prod(lab, axis=0)
             lab[lab == 1000] = 0
             self.labels[m, 0] = lab
-
-

@@ -5,3 +5,7 @@ datasets/
 *.npz
 code/__pycache__/
 code/runs/
+code/Thesis/__pycache__/
+code/Thesis/Studienarbeit/__pycache__/
+code/Thesis/runs/
+code/Thesis/Studienarbeit/runs/
