@@ -8,7 +8,7 @@ import time
 def g2d(input_channel, output_channel, kernel=5):
     return nn.Sequential(
         nn.BatchNorm2d(input_channel),
-        nn.Conv2d(input_channel, output_channel, kernel),
+        nn.Conv2d(input_channel, output_channel, kernel, padding='same'),
         nn.ReLU()
     )
 
@@ -16,7 +16,7 @@ def g2d(input_channel, output_channel, kernel=5):
 def g3d(input_channel, output_channel, kernel=(5, 5, 5)):
     return nn.Sequential(
         nn.BatchNorm3d(input_channel),
-        nn.ConvTranspose3d(input_channel, output_channel, kernel),
+        nn.Conv3d(input_channel, output_channel, kernel, padding='same'),
         nn.ReLU()
     )
 
@@ -28,15 +28,27 @@ class Generator(nn.Module):
         self.gen_input_shape = gen_input_shape
 
         self.G2d_Net = nn.Sequential(
-            g2d(self.gen_input_shape[1], self.gen_input_shape[1] * 2, kernel=5),
-            g2d(self.gen_input_shape[1] * 2, self.gen_input_shape[1] * 4, kernel=5),
-            g2d(self.gen_input_shape[1] * 4, self.gen_input_shape[1] * 8, kernel=5),
-            g2d(self.gen_input_shape[1] * 8, self.gen_input_shape[1] * 8, kernel=5)
+            g2d(self.gen_input_shape[1], 64, kernel=5),
+            g2d(64, 128),
+            g2d(128, 256),
+            g2d(256, 128),
+            g2d(128, 64),
+            g2d(64, 32),
+            g2d(32, 16),
+            g2d(16, 8),   # 8 is the depth
         )
 
         self.G3d_Net = nn.Sequential(
-            g3d(self.gen_input_shape[1], self.gen_input_shape[1] * 2, kernel=(1, 10, 10)),
-            g3d(self.gen_input_shape[1] * 2, self.gen_input_shape[1] * 2, kernel=(1, 8, 8))
+            g3d(1, 16),
+            g3d(16, 32),
+            g3d(32, 64),
+            g3d(64, 128),
+            g3d(128, 64),
+            g3d(64, 32),
+            g3d(32, 16),
+            g3d(16, 8),
+            g3d(8, 4),
+            g3d(4, 2),    # 2 is the channel dimension
         )
 
     def forward(self, gen_input):
@@ -49,8 +61,9 @@ class Generator(nn.Module):
 def d3d(input_channel, output_channel, kernel=(5, 5, 5)):
     return nn.Sequential(
         nn.BatchNorm3d(input_channel),
-        nn.Conv3d(input_channel, output_channel, kernel),
-        nn.ReLU()
+        nn.utils.spectral_norm(nn.Conv3d(input_channel, output_channel, kernel)),
+        nn.LeakyReLU(0.2),
+        nn.Dropout(p=0.2)
     )
 
 
@@ -68,14 +81,14 @@ class Discriminator(nn.Module):
         )
 
         self.f_layers = nn.Sequential(
-            nn.Linear(64 * 2 * 145 * 197, 1),
-            #nn.ReLU(),
+            nn.Linear(64 * 2 * 145 * 197, 1)
+            #nn.LeakyReLU(0.2),
             #nn.BatchNorm1d(400),
-            #nn.Linear(400, 1),
-            #nn.ReLU(),
+            #nn.Linear(400, 128),
+            #nn.LeakyReLU(0.2),
             #nn.BatchNorm1d(128),
-            #nn.Linear(128, 1),
-            #nn.ReLU(),
+            #nn.Linear(128, 64),
+            #nn.LeakyReLU(0.2),
             #nn.BatchNorm1d(64),
             #nn.Linear(64, 1)
         )
@@ -100,9 +113,9 @@ class GANs:
         self.gen_input_shape = self.gen_input.shape
         self.disc_input_shape = self.disc_input.shape
 
-        self.lr = 0.008
-        self.n_epochs = 20
-        self.batch_size = 3
+        self.lr = 0.00001
+        self.n_epochs = 10
+        self.batch_size = 7
         self.iter = 0
         self.clip_value = 0.01
 
@@ -131,10 +144,6 @@ class GANs:
 
                     disc_fake = disc(fake.detach())
                     disc_real = disc(disc_batch_input)
-
-
-
-
 
                     if loss == 'BCE':
                         disc_fake_accuracy = ((disc_fake > 0.5).float() == torch.zeros_like(disc_fake)).float().mean().item()

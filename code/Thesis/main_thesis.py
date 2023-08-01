@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-import random
 import sys
 
 sys.path.append('Studienarbeit/')
@@ -44,7 +43,7 @@ if not preload_data:
     from Studienarbeit.Data_Padding import Padding
     padded_dataset = Padding(normalized_dataset.new_dataset, load_data.pix_ranges, pad=pad)
 
-    from Studienarbeit.feature_extraction import FeatureExtraction
+    from Studienarbeit.DataFeatures import FeatureExtraction
     feature_dataset = FeatureExtraction(padded_dataset.new_dataset)
 
     from DataFiltering import DataFilter
@@ -82,7 +81,7 @@ gans_labels = np.reshape(gans_labels, (-1, 172, 224))
 
 if training:
     from GANs import GANs
-    gen_network = GANs(gen_input_data[:300, ...], disc_input_data[:300, ...], gans_labels[:300, ...], loss='BCE', log_write=log_write)
+    gen_network = GANs(gen_input_data[:100, ...], disc_input_data[:100, ...], gans_labels[:100, ...], loss='BCE', log_write=log_write)
 
     if save_network:
         torch.save(gen_network.gen.state_dict(), '../../results/' + str(dataset_dir) + '/gen_trained_model.pth')
@@ -90,9 +89,9 @@ if training:
 
 if xx:
 
-    for _ in range(10):
+    for _ in range(6):
 
-        j = np.random.randint(low=0, high=100)
+        j = np.random.randint(low=0, high=7)
 
         sigma = np.load('../../results/' + str(dataset_dir) + '/sigma.npz')
         sigma = sigma['sigma']
@@ -100,36 +99,36 @@ if xx:
         from Studienarbeit.images_labels import images_and_labels
         [x_data, y_data] = images_and_labels(r_i_dataset[j:j+1, ...], 5, 5, 1, 9, sigma, shuffle=False)
 
+
         from Studienarbeit.deep_neural_networks import Net
-        model1 = Net(input_shape=x_data.shape, output_shape=14).to('cpu')
+        model1 = Net(input_shape=x_data.shape, output_shape=14).to('cuda:1')
 
         trained_model = torch.load('../../results/' + str(dataset_dir) + '/trained_model.pth')
         model1.load_state_dict(trained_model)
         model1.eval()
 
-        output1 = torch.argmax(model1(torch.Tensor(x_data).to('cpu')), 1)
-        accuracy1 = (output1 == torch.Tensor(np.ravel(gans_labels[j, ...]))).float().mean().item() * 100
+        output1 = torch.argmax(model1(torch.Tensor(x_data).to('cuda:1')), 1)
+        accuracy1 = (output1 == torch.Tensor(np.ravel(gans_labels[j, ...])).to('cuda:1')).float().mean().item() * 100
 
         from GANs import Generator
-        model2 = Generator(gen_input_data[:100, ...].shape).to('cuda')
+        model2 = Generator(gen_input_data[:7, ...].shape).to('cuda:2')
         trained_model = torch.load('../../results/' + str(dataset_dir) + '/gen_trained_model.pth')
         model2.load_state_dict(trained_model)
         model2.eval()
 
-        fake = model2(torch.from_numpy(gen_input_data[:100, ...]).to(torch.float).to('cuda'))
-        fake = fake.detach().to('cpu').numpy()
+        fake = model2(torch.Tensor(gen_input_data[:7, ...]).to('cuda:2').float()).to('cpu')
+        fake = fake.detach().numpy()
 
         fake_imgs = np.empty((fake.shape[0], 1), dtype=object)
         for i in range(len(fake)):
             fake_imgs[i, 0] = fake[i, ...]
 
         [x_data, y_data] = images_and_labels(fake_imgs[j:j+1, ...], 5, 5, 1, 9, sigma, shuffle=False)
-        output2 = torch.argmax(model1(torch.Tensor(x_data).to('cpu')), 1)
-        accuracy2 = (output2 == torch.Tensor(np.ravel(gans_labels[j, ...]))).float().mean().item() * 100
+        output2 = torch.argmax(model1(torch.Tensor(x_data).to('cuda:1')), 1)
+        accuracy2 = (output2 == torch.Tensor(np.ravel(gans_labels[j, ...])).to('cuda:1')).float().mean().item() * 100
 
         import matplotlib.pyplot as plt
         import matplotlib.colors as colors
-        from matplotlib.colors import ListedColormap
 
         fig = plt.figure()
 
