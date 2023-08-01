@@ -10,11 +10,11 @@ preload_data = True
 crop_pixel_of_interest = True
 pad = False
 log_write = False
-save_dataset = False
+save_dataset = True
 training = True
 save_network = True
 
-dataset_dir = 'dataset_1'
+dataset_dir = 'dataset_2'
 
 if not preload_data:
     '''
